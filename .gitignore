@@ -1,0 +1,9 @@
+﻿################################################################################
+# This .gitignore file was automatically created by Microsoft(R) Visual Studio.
+################################################################################
+
+/.vs
+/MDK
+/obj/x64/Debug
+/Thrust Levels Display.csproj
+/Thrust-Levels-Display.wsp
