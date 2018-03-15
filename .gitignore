@@ -7,3 +7,6 @@
 /obj/x64/Debug
 /Thrust Levels Display.csproj
 /Thrust-Levels-Display.wsp
+/obj/Debug
+/bin
+/.gitignore

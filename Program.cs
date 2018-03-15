@@ -43,26 +43,25 @@ namespace IngameScript
                 return;
             }
 
-            /* Two dimensional array holding current and max thrust.
-             * First dimension:
-             * 0 - upwards      3 - backwards
-             * 1 - downwards    4 - left
-             * 2 - forwards     5 - right
-             * Second dimension:
-             * 0 - current thrust   1 - max thrust */
-            float[,] thrustValues = new float[6, 2];
-            GetThrust(ref thrusters, ref thrustValues);
+            GroupedThrusters[] groupedThrusters = {
+                new GroupedThrusters("Up"),
+                new GroupedThrusters("Down"),
+                new GroupedThrusters("Forward"),
+                new GroupedThrusters("Backward"),
+                new GroupedThrusters("Left"),
+                new GroupedThrusters("Right"),
+            };
 
-            string[] displayText = new string[6] { " Up: ", " Down: ", " Forward: ", " Backward: ", " Left: ", " Right: " };
+            GetThrust(ref thrusters, ref groupedThrusters);
 
             foreach (IMyTextPanel display in displays)
             {
                 if (display.CustomName.Contains(lcdTag))
                 {
-                    for (int i = 0; i < displayText.Length; i++)
+                    for (int i = 0; i < groupedThrusters.Length; i++)
                     {
-                        float thrustPercent = (thrustValues[i, 0] / thrustValues[i, 1]) * 100;
-                        string displayLine = displayText[i] + ToSI(thrustValues[i, 0], "n0") + "N/" + ToSI(thrustValues[i, 1], "n0") + "N\n";
+                        float thrustPercent = (groupedThrusters[i].currentThrust / groupedThrusters[i].maxEffectiveThrust) * 100;
+                        string displayLine = groupedThrusters[i].directionName + ToSI(groupedThrusters[i].currentThrust, "n0") + "N/" + ToSI(groupedThrusters[i].maxEffectiveThrust, "n0") + "N\n";
                         displayLine += " " + thrustPercent.ToString("n1") + "%\n";
 
                         // Write on the display.
@@ -75,41 +74,41 @@ namespace IngameScript
         }
 
         // Fill up the array with thrust values.
-        void GetThrust(ref List<IMyThrust> thrusters, ref float[,] thrustValues)
+        void GetThrust(ref List<IMyThrust> thrusters, ref GroupedThrusters[] groupedThrusters)
         {
             foreach (IMyThrust thruster in thrusters)
             {
+                // This returns direction of the nozzle. If statements are inverted to get direction of thrust instead.
                 Vector3I direction = thruster.GridThrustDirection;
-                //Up and down thrusters seem to be inverted. Need to test on more cockpits.
                 if (direction == VRageMath.Vector3I.Down)
                 {
-                    thrustValues[0, 0] += thruster.CurrentThrust;
-                    thrustValues[0, 1] += thruster.MaxEffectiveThrust;
+                    groupedThrusters[0].currentThrust += thruster.CurrentThrust;
+                    groupedThrusters[0].maxEffectiveThrust += thruster.MaxEffectiveThrust;
                 }
                 else if (direction == VRageMath.Vector3I.Up)
                 {
-                    thrustValues[1, 0] += thruster.CurrentThrust;
-                    thrustValues[1, 1] += thruster.MaxEffectiveThrust;
-                }
-                else if (direction == VRageMath.Vector3I.Forward)
-                {
-                    thrustValues[2, 0] += thruster.CurrentThrust;
-                    thrustValues[2, 1] += thruster.MaxEffectiveThrust;
+                    groupedThrusters[1].currentThrust += thruster.CurrentThrust;
+                    groupedThrusters[1].maxEffectiveThrust += thruster.MaxEffectiveThrust;
                 }
                 else if (direction == VRageMath.Vector3I.Backward)
                 {
-                    thrustValues[3, 0] += thruster.CurrentThrust;
-                    thrustValues[3, 1] += thruster.MaxEffectiveThrust;
+                    groupedThrusters[2].currentThrust += thruster.CurrentThrust;
+                    groupedThrusters[2].maxEffectiveThrust += thruster.MaxEffectiveThrust;
                 }
-                else if (direction == VRageMath.Vector3I.Left)
+                else if (direction == VRageMath.Vector3I.Forward)
                 {
-                    thrustValues[4, 0] += thruster.CurrentThrust;
-                    thrustValues[4, 1] += thruster.MaxEffectiveThrust;
+                    groupedThrusters[3].currentThrust += thruster.CurrentThrust;
+                    groupedThrusters[3].maxEffectiveThrust += thruster.MaxEffectiveThrust;
                 }
                 else if (direction == VRageMath.Vector3I.Right)
                 {
-                    thrustValues[5, 0] += thruster.CurrentThrust;
-                    thrustValues[5, 1] += thruster.MaxEffectiveThrust;
+                    groupedThrusters[4].currentThrust += thruster.CurrentThrust;
+                    groupedThrusters[4].maxEffectiveThrust += thruster.MaxEffectiveThrust;
+                }
+                else if (direction == VRageMath.Vector3I.Left)
+                {
+                    groupedThrusters[5].currentThrust += thruster.CurrentThrust;
+                    groupedThrusters[5].maxEffectiveThrust += thruster.MaxEffectiveThrust;
                 }
             }
         }
@@ -135,6 +134,21 @@ namespace IngameScript
             }
 
             return scaled.ToString(format) + prefix;
+        }
+
+        // Struct for grouping thrusters for each direction.
+        private struct GroupedThrusters
+        {
+            public string directionName;
+            public float currentThrust;
+            public float maxEffectiveThrust;
+
+            public GroupedThrusters (string name)
+            {
+                directionName = name;
+                currentThrust = 0;
+                maxEffectiveThrust = 0;
+            }
         }
     }
 }
