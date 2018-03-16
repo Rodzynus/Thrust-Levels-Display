@@ -44,12 +44,12 @@ namespace IngameScript
             }
 
             GroupedThrusters[] groupedThrusters = {
-                new GroupedThrusters("Up"),
-                new GroupedThrusters("Down"),
-                new GroupedThrusters("Forward"),
-                new GroupedThrusters("Backward"),
-                new GroupedThrusters("Left"),
-                new GroupedThrusters("Right"),
+                new GroupedThrusters("Up: "),
+                new GroupedThrusters("Down: "),
+                new GroupedThrusters("Forward: "),
+                new GroupedThrusters("Backward: "),
+                new GroupedThrusters("Left: "),
+                new GroupedThrusters("Right: "),
             };
 
             GetThrust(ref thrusters, ref groupedThrusters);
