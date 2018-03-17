@@ -87,7 +87,7 @@ namespace IngameScript
                         for (int i = 0; i < groupedThrusters.Length; i++)
                         {
                             float thrustPercent = (groupedThrusters[i].currentThrust / groupedThrusters[i].maxEffectiveThrust) * 100;
-                            displayLines += groupedThrusters[i].directionName + ToSI(groupedThrusters[i].currentThrust, "n0") + "N/" + ToSI(groupedThrusters[i].maxEffectiveThrust, "n0") + "N\n";
+                            displayLines += " " + groupedThrusters[i].directionName + ": " + ToSI(groupedThrusters[i].currentThrust, "n0") + "N/" + ToSI(groupedThrusters[i].maxEffectiveThrust, "n0") + "N\n";
                             displayLines += " " + thrustPercent.ToString("n1") + "%\n";
                         }
                     }
@@ -114,12 +114,12 @@ namespace IngameScript
             }
 
             GroupedThrusters[] groupedThrusters = {
-                new GroupedThrusters(" Up: "),
-                new GroupedThrusters(" Down: "),
-                new GroupedThrusters(" Forward: "),
-                new GroupedThrusters(" Backward: "),
-                new GroupedThrusters(" Left: "),
-                new GroupedThrusters(" Right: "),
+                new GroupedThrusters("Up"),
+                new GroupedThrusters("Down"),
+                new GroupedThrusters("Forward"),
+                new GroupedThrusters("Backward"),
+                new GroupedThrusters("Left"),
+                new GroupedThrusters("Right"),
             };
 
             if (thrusters.Count == 0) { return groupedThrusters; }
