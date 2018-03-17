@@ -48,6 +48,50 @@ namespace IngameScript
                 return;
             }
 
+            foreach (IMyTextPanel display in displays)
+            {
+                if (display.CustomName.Contains(lcdTag))
+                {
+                    string groupName = "";
+                    string[] customLines = display.CustomData.Split('\n');
+                    foreach (string line in customLines)
+                    {
+                        if (line.Contains("g:"))
+                        {
+                            groupName = line.Substring(line.IndexOf(':')+1);
+                        }
+                    }
+                    GroupedThrusters[] groupedThrusters = GetThrust(groupName);
+                    string displayLines = "";
+
+                    for (int i = 0; i < groupedThrusters.Length; i++)
+                    {
+                        float thrustPercent = (groupedThrusters[i].currentThrust / groupedThrusters[i].maxEffectiveThrust) * 100;
+                        displayLines += groupedThrusters[i].directionName + ToSI(groupedThrusters[i].currentThrust, "n0") + "N/" + ToSI(groupedThrusters[i].maxEffectiveThrust, "n0") + "N\n";
+                        displayLines += " " + thrustPercent.ToString("n1") + "%\n";
+                    }
+                    // Write on the display.
+                    display.WritePublicText(displayLines, false);
+                    display.ShowPublicTextOnScreen();
+                }
+            }
+        }
+
+        // Fill up the array with thrust values.
+        GroupedThrusters[] GetThrust(string groupName = "")
+        {
+            List<IMyThrust> thrusters = new List<IMyThrust>();
+            if (!string.IsNullOrWhiteSpace(groupName) )
+            {
+                try
+                { GridTerminalSystem.GetBlockGroupWithName(groupName).GetBlocksOfType<IMyThrust>(thrusters);
+                } catch (Exception)
+                { Echo($"Group {groupName} doesn't exist."); }
+            } else
+            {
+                GridTerminalSystem.GetBlocksOfType<IMyThrust>(thrusters);
+            }
+
             GroupedThrusters[] groupedThrusters = {
                 new GroupedThrusters(" Up: "),
                 new GroupedThrusters(" Down: "),
@@ -57,30 +101,8 @@ namespace IngameScript
                 new GroupedThrusters(" Right: "),
             };
 
-            GetThrust(ref thrusters, ref groupedThrusters);
+            if (thrusters.Count == 0) { return groupedThrusters; }
 
-            foreach (IMyTextPanel display in displays)
-            {
-                if (display.CustomName.Contains(lcdTag))
-                {
-                    for (int i = 0; i < groupedThrusters.Length; i++)
-                    {
-                        float thrustPercent = (groupedThrusters[i].currentThrust / groupedThrusters[i].maxEffectiveThrust) * 100;
-                        string displayLine = groupedThrusters[i].directionName + ToSI(groupedThrusters[i].currentThrust, "n0") + "N/" + ToSI(groupedThrusters[i].maxEffectiveThrust, "n0") + "N\n";
-                        displayLine += " " + thrustPercent.ToString("n1") + "%\n";
-
-                        // Write on the display.
-                        if (i == 0) { display.WritePublicText(displayLine, false); }
-                        else { display.WritePublicText(displayLine, true); }
-                    }
-                    display.ShowPublicTextOnScreen();
-                }
-            }
-        }
-
-        // Fill up the array with thrust values.
-        void GetThrust(ref List<IMyThrust> thrusters, ref GroupedThrusters[] groupedThrusters)
-        {
             foreach (IMyThrust thruster in thrusters)
             {
                 // This returns direction of the nozzle. If statements are inverted to get direction of thrust instead.
@@ -116,6 +138,7 @@ namespace IngameScript
                     groupedThrusters[5].maxEffectiveThrust += thruster.MaxEffectiveThrust;
                 }
             }
+            return groupedThrusters;
         }
 
         // Not my own piece of code, method found here: https://stackoverflow.com/questions/12181024/formatting-a-number-with-a-metric-prefix
