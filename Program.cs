@@ -20,8 +20,16 @@ namespace IngameScript
     {
         /* Thrust Levels Display by Rodzyn *
         *  Displays current thrust for each direction. *
-        *  Written using MDK for SE: https://github.com/malware-dev/MDK-SE */
+        *  Written using MDK for SE: https://github.com/malware-dev/MDK-SE *
 
+        * ======= Usage: ====== *
+        * Set the tag you want to use to mark LCDs used by the script.
+        * The script will now show you values for all thrusters.
+        * To show only specific group add 'g:GroupName' to Custom Data of an LCD
+        * Ex. g:Special Thrusters
+
+        * === Configuration: == */
+       
         // Tag which scripts looks for when finding LCDs to write to.
         const string lcdTag = "[thrusters]";
 
@@ -52,23 +60,36 @@ namespace IngameScript
             {
                 if (display.CustomName.Contains(lcdTag))
                 {
-                    string groupName = "";
-                    string[] customLines = display.CustomData.Split('\n');
-                    foreach (string line in customLines)
+                    // Get all group names from Custom Data and store them in a list.
+                    List<string> groupNames = new List<string>();
+                    if (display.CustomData.Contains("g:"))
                     {
-                        if (line.Contains("g:"))
+                        string[] customLines = display.CustomData.Split('\n');
+                        foreach (string line in customLines)
                         {
-                            groupName = line.Substring(line.IndexOf(':')+1);
+                            if (line.Contains("g:"))
+                            {
+                                groupNames.Add(line.Substring(line.IndexOf(':') + 1));
+                            }
                         }
                     }
-                    GroupedThrusters[] groupedThrusters = GetThrust(groupName);
+                    else
+                    {
+                        // If groups are not set up, add an empty string.
+                        groupNames.Add("");
+                    }
                     string displayLines = "";
 
-                    for (int i = 0; i < groupedThrusters.Length; i++)
+                    foreach (string groupName in groupNames)
                     {
-                        float thrustPercent = (groupedThrusters[i].currentThrust / groupedThrusters[i].maxEffectiveThrust) * 100;
-                        displayLines += groupedThrusters[i].directionName + ToSI(groupedThrusters[i].currentThrust, "n0") + "N/" + ToSI(groupedThrusters[i].maxEffectiveThrust, "n0") + "N\n";
-                        displayLines += " " + thrustPercent.ToString("n1") + "%\n";
+                        GroupedThrusters[] groupedThrusters = GetThrust(groupName);
+
+                        for (int i = 0; i < groupedThrusters.Length; i++)
+                        {
+                            float thrustPercent = (groupedThrusters[i].currentThrust / groupedThrusters[i].maxEffectiveThrust) * 100;
+                            displayLines += groupedThrusters[i].directionName + ToSI(groupedThrusters[i].currentThrust, "n0") + "N/" + ToSI(groupedThrusters[i].maxEffectiveThrust, "n0") + "N\n";
+                            displayLines += " " + thrustPercent.ToString("n1") + "%\n";
+                        }
                     }
                     // Write on the display.
                     display.WritePublicText(displayLines, false);
