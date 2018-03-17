@@ -18,6 +18,11 @@ namespace IngameScript
 {
     partial class Program : MyGridProgram
     {
+        /* Thrust Levels Display by Rodzyn *
+        *  Displays current thrust for each direction. *
+        *  Written using MDK for SE: https://github.com/malware-dev/MDK-SE */
+
+        // Tag which scripts looks for when finding LCDs to write to.
         const string lcdTag = "[thrusters]";
 
         Program()
@@ -44,12 +49,12 @@ namespace IngameScript
             }
 
             GroupedThrusters[] groupedThrusters = {
-                new GroupedThrusters("Up: "),
-                new GroupedThrusters("Down: "),
-                new GroupedThrusters("Forward: "),
-                new GroupedThrusters("Backward: "),
-                new GroupedThrusters("Left: "),
-                new GroupedThrusters("Right: "),
+                new GroupedThrusters(" Up: "),
+                new GroupedThrusters(" Down: "),
+                new GroupedThrusters(" Forward: "),
+                new GroupedThrusters(" Backward: "),
+                new GroupedThrusters(" Left: "),
+                new GroupedThrusters(" Right: "),
             };
 
             GetThrust(ref thrusters, ref groupedThrusters);
