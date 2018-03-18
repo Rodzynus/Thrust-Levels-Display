@@ -25,8 +25,13 @@ namespace IngameScript
         * ======= Usage: ====== *
         * Set the tag you want to use to mark LCDs used by the script.
         * The script will now show you values for all thrusters.
-        * To show only specific group add 'g:GroupName' to Custom Data of an LCD
-        * Ex. g:Special Thrusters
+        * 
+        * To show only specific group add 'group:GroupName' to Custom Data of an LCD.
+        * Ex. group:Special Thrusters
+        *
+        * To filter direction you want to display, type directions separated by a colon (case sensitive).
+        * Ex. Up:Forward:Left:Right
+        * Ex. group:Special Thrusters:Forward:Up
 
         * === Configuration: == */
        
@@ -40,14 +45,6 @@ namespace IngameScript
 
         public void Main()
         {
-            List<IMyThrust> thrusters = new List<IMyThrust>();
-            GridTerminalSystem.GetBlocksOfType<IMyThrust>(thrusters);
-            if (thrusters.Count == 0)
-            {
-                Echo("No thrusters detected.");
-                return;
-            }
-
             List<IMyTextPanel> displays = new List<IMyTextPanel>();
             GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(displays);
             if (displays.Count == 0)
@@ -60,34 +57,29 @@ namespace IngameScript
             {
                 if (display.CustomName.Contains(lcdTag))
                 {
-                    // Get all group names from Custom Data and store them in a list.
-                    List<string> groupNames = new List<string>();
-                    if (display.CustomData.Contains("g:"))
+                    // List containing all lines to be passed as arguments to the GetThrust method.
+                    List<string> arguments = new List<string>();
+                    if (display.CustomData.Length > 0)
                     {
                         string[] customLines = display.CustomData.Split('\n');
                         foreach (string line in customLines)
                         {
-                            if (line.Contains("g:"))
-                            {
-                                groupNames.Add(line.Substring(line.IndexOf(':') + 1));
-                            }
+                            arguments.Add(line);
                         }
-                    }
-                    else
+                    } else
                     {
-                        // If groups are not set up, add an empty string.
-                        groupNames.Add("");
+                        arguments.Add("");
                     }
                     string displayLines = "";
 
-                    foreach (string groupName in groupNames)
+                    foreach (string argument in arguments)
                     {
-                        GroupedThrusters[] groupedThrusters = GetThrust(groupName);
+                        List<GroupedThrusters> groupedThrusters = GetThrust(argument);
 
-                        for (int i = 0; i < groupedThrusters.Length; i++)
+                        foreach(GroupedThrusters groupedThruster in groupedThrusters)
                         {
-                            float thrustPercent = (groupedThrusters[i].currentThrust / groupedThrusters[i].maxEffectiveThrust) * 100;
-                            displayLines += " " + groupedThrusters[i].directionName + ": " + ToSI(groupedThrusters[i].currentThrust, "n0") + "N/" + ToSI(groupedThrusters[i].maxEffectiveThrust, "n0") + "N\n";
+                            float thrustPercent = (groupedThruster.currentThrust / groupedThruster.maxEffectiveThrust) * 100;
+                            displayLines += " " + groupedThruster.directionName + ": " + ToSI(groupedThruster.currentThrust, "n0") + "N/" + ToSI(groupedThruster.maxEffectiveThrust, "n0") + "N\n";
                             displayLines += " " + thrustPercent.ToString("n1") + "%\n";
                         }
                     }
@@ -99,8 +91,38 @@ namespace IngameScript
         }
 
         // Fill up the array with thrust values.
-        GroupedThrusters[] GetThrust(string groupName = "")
+        List<GroupedThrusters> GetThrust(string arguments)
         {
+            string[] argumentsSplit = arguments.Split(':');
+
+            string groupName = "";
+
+            if (argumentsSplit[0].ToLower() == "group")
+            {
+                groupName = argumentsSplit[1];
+            }
+
+            // Compare list of arguments against matching directions and add them to list of GroupedThrusters.
+            List<GroupedThrusters> groupedThrusters = new List<GroupedThrusters>();
+            foreach (string argument in argumentsSplit)
+            {
+                if (argument == "Up" || argument == "Down" || argument == "Forward" || argument == "Backward" || argument == "Left" || argument == "Right")
+                {
+                    groupedThrusters.Add(new GroupedThrusters(argument));
+                }
+            }
+
+            // If no valid arguments were found, add all thrusters.
+            if (groupedThrusters.Count == 0)
+            {
+                groupedThrusters.Add(new GroupedThrusters("Up"));
+                groupedThrusters.Add(new GroupedThrusters("Down"));
+                groupedThrusters.Add(new GroupedThrusters("Forward"));
+                groupedThrusters.Add(new GroupedThrusters("Backward"));
+                groupedThrusters.Add(new GroupedThrusters("Left"));
+                groupedThrusters.Add(new GroupedThrusters("Right"));
+            }
+
             List<IMyThrust> thrusters = new List<IMyThrust>();
             if (!string.IsNullOrWhiteSpace(groupName) )
             {
@@ -113,50 +135,35 @@ namespace IngameScript
                 GridTerminalSystem.GetBlocksOfType<IMyThrust>(thrusters);
             }
 
-            GroupedThrusters[] groupedThrusters = {
-                new GroupedThrusters("Up"),
-                new GroupedThrusters("Down"),
-                new GroupedThrusters("Forward"),
-                new GroupedThrusters("Backward"),
-                new GroupedThrusters("Left"),
-                new GroupedThrusters("Right"),
-            };
-
             if (thrusters.Count == 0) { return groupedThrusters; }
 
             foreach (IMyThrust thruster in thrusters)
             {
                 // This returns direction of the nozzle. If statements are inverted to get direction of thrust instead.
-                Vector3I direction = thruster.GridThrustDirection;
-                if (direction == VRageMath.Vector3I.Down)
+                string direction = VRageMath.Vector3I.GetDominantDirection(thruster.GridThrustDirection).ToString();
+                switch (direction)
                 {
-                    groupedThrusters[0].currentThrust += thruster.CurrentThrust;
-                    groupedThrusters[0].maxEffectiveThrust += thruster.MaxEffectiveThrust;
+                    case "Up":
+                        direction = "Down"; break;
+                    case "Down":
+                        direction = "Up"; break;
+                    case "Forward":
+                        direction = "Backward"; break;
+                    case "Backward":
+                        direction = "Forward"; break;
+                    case "Left":
+                        direction = "Right"; break;
+                    case "Right":
+                        direction = "Left"; break;
                 }
-                else if (direction == VRageMath.Vector3I.Up)
+
+                foreach (GroupedThrusters groupedThruster in groupedThrusters)
                 {
-                    groupedThrusters[1].currentThrust += thruster.CurrentThrust;
-                    groupedThrusters[1].maxEffectiveThrust += thruster.MaxEffectiveThrust;
-                }
-                else if (direction == VRageMath.Vector3I.Backward)
-                {
-                    groupedThrusters[2].currentThrust += thruster.CurrentThrust;
-                    groupedThrusters[2].maxEffectiveThrust += thruster.MaxEffectiveThrust;
-                }
-                else if (direction == VRageMath.Vector3I.Forward)
-                {
-                    groupedThrusters[3].currentThrust += thruster.CurrentThrust;
-                    groupedThrusters[3].maxEffectiveThrust += thruster.MaxEffectiveThrust;
-                }
-                else if (direction == VRageMath.Vector3I.Right)
-                {
-                    groupedThrusters[4].currentThrust += thruster.CurrentThrust;
-                    groupedThrusters[4].maxEffectiveThrust += thruster.MaxEffectiveThrust;
-                }
-                else if (direction == VRageMath.Vector3I.Left)
-                {
-                    groupedThrusters[5].currentThrust += thruster.CurrentThrust;
-                    groupedThrusters[5].maxEffectiveThrust += thruster.MaxEffectiveThrust;
+                    if (groupedThruster.directionName == direction)
+                    {
+                        groupedThruster.currentThrust += thruster.CurrentThrust;
+                        groupedThruster.maxEffectiveThrust += thruster.MaxEffectiveThrust;
+                    }
                 }
             }
             return groupedThrusters;
@@ -185,8 +192,8 @@ namespace IngameScript
             return scaled.ToString(format) + prefix;
         }
 
-        // Struct for grouping thrusters for each direction.
-        private struct GroupedThrusters
+        // Class for grouping thrusters for each direction.
+        private class GroupedThrusters
         {
             public string directionName;
             public float currentThrust;
