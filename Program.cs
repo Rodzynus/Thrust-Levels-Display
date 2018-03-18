@@ -29,7 +29,7 @@ namespace IngameScript
         * To show only specific group add 'group:GroupName' to Custom Data of an LCD.
         * Ex. group:Special Thrusters
         *
-        * To filter direction you want to display, type directions separated by a colon (case sensitive).
+        * To filter direction you want to display, type directions separated by a colon.
         * Ex. Up:Forward:Left:Right
         * Ex. group:Special Thrusters:Forward:Up
 
@@ -40,7 +40,7 @@ namespace IngameScript
 
         Program()
         {
-            Runtime.UpdateFrequency = UpdateFrequency.Update100;
+            Runtime.UpdateFrequency = UpdateFrequency.Update10;
         }
 
         public void Main()
@@ -62,25 +62,27 @@ namespace IngameScript
                     if (display.CustomData.Length > 0)
                     {
                         string[] customLines = display.CustomData.Split('\n');
-                        foreach (string line in customLines)
-                        {
-                            arguments.Add(line);
-                        }
-                    } else
-                    {
-                        arguments.Add("");
+                        foreach (string line in customLines) arguments.Add(line);
                     }
+                    else arguments.Add("");
+
                     string displayLines = "";
 
                     foreach (string argument in arguments)
                     {
                         List<GroupedThrusters> groupedThrusters = GetThrust(argument);
 
-                        foreach(GroupedThrusters groupedThruster in groupedThrusters)
+                        if (argument.ToLower().StartsWith("group"))
                         {
-                            float thrustPercent = (groupedThruster.currentThrust / groupedThruster.maxEffectiveThrust) * 100;
+                            string[] argumentsSplit = argument.Split(':');
+                            string groupName = argumentsSplit[1];
+                            displayLines += " " + groupName + ":\n";
+                        }
+
+                        foreach (GroupedThrusters groupedThruster in groupedThrusters)
+                        {
                             displayLines += " " + groupedThruster.directionName + ": " + ToSI(groupedThruster.currentThrust, "n0") + "N/" + ToSI(groupedThruster.maxEffectiveThrust, "n0") + "N\n";
-                            displayLines += " " + thrustPercent.ToString("n1") + "%\n";
+                            displayLines += " " + groupedThruster.Percentage().ToString("n1") + "%\n";
                         }
                     }
                     // Write on the display.
@@ -97,19 +99,15 @@ namespace IngameScript
 
             string groupName = "";
 
-            if (argumentsSplit[0].ToLower() == "group")
-            {
-                groupName = argumentsSplit[1];
-            }
+            if (argumentsSplit[0].ToLower() == "group") groupName = argumentsSplit[1];
 
             // Compare list of arguments against matching directions and add them to list of GroupedThrusters.
             List<GroupedThrusters> groupedThrusters = new List<GroupedThrusters>();
             foreach (string argument in argumentsSplit)
             {
-                if (argument == "Up" || argument == "Down" || argument == "Forward" || argument == "Backward" || argument == "Left" || argument == "Right")
-                {
-                    groupedThrusters.Add(new GroupedThrusters(argument));
-                }
+                string formArgument = FirstLetterCapital(argument);
+                if (formArgument == "Up" || formArgument == "Down" || formArgument == "Forward" || formArgument == "Backward" || formArgument == "Left" || formArgument == "Right")
+                    groupedThrusters.Add(new GroupedThrusters(formArgument));
             }
 
             // If no valid arguments were found, add all thrusters.
@@ -130,12 +128,10 @@ namespace IngameScript
                 { GridTerminalSystem.GetBlockGroupWithName(groupName).GetBlocksOfType<IMyThrust>(thrusters);
                 } catch (Exception)
                 { Echo($"Group {groupName} doesn't exist."); }
-            } else
-            {
-                GridTerminalSystem.GetBlocksOfType<IMyThrust>(thrusters);
             }
+            else GridTerminalSystem.GetBlocksOfType<IMyThrust>(thrusters);
 
-            if (thrusters.Count == 0) { return groupedThrusters; }
+            if (thrusters.Count == 0) return groupedThrusters;
 
             foreach (IMyThrust thruster in thrusters)
             {
@@ -172,10 +168,8 @@ namespace IngameScript
         // Not my own piece of code, method found here: https://stackoverflow.com/questions/12181024/formatting-a-number-with-a-metric-prefix
         public string ToSI(float f, string format = null)
         {
-            if (f == 0)
-            {
-                return "0";
-            }
+            if (f == 0) return "0";
+
             char[] incPrefixes = new[] { 'k', 'M', 'G', 'T', 'P', 'E', 'Z', 'Y' };
             char[] decPrefixes = new[] { 'm', '\u03bc', 'n', 'p', 'f', 'a', 'z', 'y' };
 
@@ -192,6 +186,18 @@ namespace IngameScript
             return scaled.ToString(format) + prefix;
         }
 
+        // Makes first letter of a string upper case and the rest lower case.
+        public string FirstLetterCapital(string s)
+        {
+            if (string.IsNullOrEmpty(s))  return "";
+
+            if (s.Length == 1) return s.ToUpper();
+
+            char[] c = s.ToLower().ToCharArray();
+            c[0] = char.ToUpper(c[0]);
+            return new string (c);
+        }
+
         // Class for grouping thrusters for each direction.
         private class GroupedThrusters
         {
@@ -204,6 +210,11 @@ namespace IngameScript
                 directionName = name;
                 currentThrust = 0;
                 maxEffectiveThrust = 0;
+            }
+
+            public float Percentage()
+            {
+                return (currentThrust / maxEffectiveThrust) * 100;
             }
         }
     }
