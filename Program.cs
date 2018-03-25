@@ -20,26 +20,31 @@ namespace IngameScript
     {
         /* Thrust Levels Display by Rodzyn *
         *  Displays current thrust for each direction. *
-        *  Written using MDK for SE: https://github.com/malware-dev/MDK-SE */
+        *  Written using MDK for SE: https://github.com/malware-dev/MDK-SE *
 
+        * ======= Usage: ====== *
+        * Set the tag you want to use to mark LCDs used by the script.
+        * The script will now show you values for all thrusters.
+        * 
+        * To show only specific group add 'group:GroupName' to Custom Data of an LCD.
+        * Ex. group:Special Thrusters
+        *
+        * To filter direction you want to display, type directions separated by a colon.
+        * Ex. Up:Forward:Left:Right
+        * Ex. group:Special Thrusters:Forward:Up
+
+        * === Configuration: == */
+       
         // Tag which scripts looks for when finding LCDs to write to.
         const string lcdTag = "[thrusters]";
 
         Program()
         {
-            Runtime.UpdateFrequency = UpdateFrequency.Update100;
+            Runtime.UpdateFrequency = UpdateFrequency.Update10;
         }
 
         public void Main()
         {
-            List<IMyThrust> thrusters = new List<IMyThrust>();
-            GridTerminalSystem.GetBlocksOfType<IMyThrust>(thrusters);
-            if (thrusters.Count == 0)
-            {
-                Echo("No thrusters detected.");
-                return;
-            }
-
             List<IMyTextPanel> displays = new List<IMyTextPanel>();
             GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(displays);
             if (displays.Count == 0)
@@ -48,83 +53,56 @@ namespace IngameScript
                 return;
             }
 
-            GroupedThrusters[] groupedThrusters = {
-                new GroupedThrusters(" Up: "),
-                new GroupedThrusters(" Down: "),
-                new GroupedThrusters(" Forward: "),
-                new GroupedThrusters(" Backward: "),
-                new GroupedThrusters(" Left: "),
-                new GroupedThrusters(" Right: "),
-            };
-
-            GetThrust(ref thrusters, ref groupedThrusters);
-
             foreach (IMyTextPanel display in displays)
             {
                 if (display.CustomName.Contains(lcdTag))
                 {
-                    for (int i = 0; i < groupedThrusters.Length; i++)
+                    List<ParseArguments> arguments = new List<ParseArguments>();
+                    if (display.CustomData.Length > 0)
                     {
-                        float thrustPercent = (groupedThrusters[i].currentThrust / groupedThrusters[i].maxEffectiveThrust) * 100;
-                        string displayLine = groupedThrusters[i].directionName + ToSI(groupedThrusters[i].currentThrust, "n0") + "N/" + ToSI(groupedThrusters[i].maxEffectiveThrust, "n0") + "N\n";
-                        displayLine += " " + thrustPercent.ToString("n1") + "%\n";
-
-                        // Write on the display.
-                        if (i == 0) { display.WritePublicText(displayLine, false); }
-                        else { display.WritePublicText(displayLine, true); }
+                        string[] customLines = display.CustomData.Split('\n');
+                        foreach (string line in customLines) arguments.Add(new ParseArguments(line));
                     }
+                    
+                    List<GroupOfThrusters> groupsOfThrusters = new List<GroupOfThrusters>();
+
+                    if (arguments.Count > 0)
+                    {
+                        foreach (ParseArguments argument in arguments)
+                        {
+                            groupsOfThrusters.Add(new GroupOfThrusters(this, argument));
+                        }
+                    }
+                    else groupsOfThrusters.Add(new GroupOfThrusters(this));
+                    
+                    string displayLines = "";
+
+                    foreach (GroupOfThrusters groupOfThrusters in groupsOfThrusters)
+                    {
+                        if (!string.IsNullOrEmpty(groupOfThrusters.Group))
+                        {
+                            displayLines += $" {groupOfThrusters.Group}:\n";
+                        }
+
+                        foreach (DirectionalThrusters thruster in groupOfThrusters.Thrusters)
+                        {
+                            displayLines += $" {thruster.DirectionName} {ToSI(thruster.CurrentThrust, "n0")}N/{ToSI(thruster.MaxEffectiveThrust, "n0")}N\n";
+                            displayLines += $" {thruster.Percentage().ToString("n1")}%\n";
+                        }
+                    }
+
+                    // Write on the display.
+                    display.WritePublicText(displayLines, false);
                     display.ShowPublicTextOnScreen();
                 }
             }
         }
 
-        // Fill up the array with thrust values.
-        void GetThrust(ref List<IMyThrust> thrusters, ref GroupedThrusters[] groupedThrusters)
-        {
-            foreach (IMyThrust thruster in thrusters)
-            {
-                // This returns direction of the nozzle. If statements are inverted to get direction of thrust instead.
-                Vector3I direction = thruster.GridThrustDirection;
-                if (direction == VRageMath.Vector3I.Down)
-                {
-                    groupedThrusters[0].currentThrust += thruster.CurrentThrust;
-                    groupedThrusters[0].maxEffectiveThrust += thruster.MaxEffectiveThrust;
-                }
-                else if (direction == VRageMath.Vector3I.Up)
-                {
-                    groupedThrusters[1].currentThrust += thruster.CurrentThrust;
-                    groupedThrusters[1].maxEffectiveThrust += thruster.MaxEffectiveThrust;
-                }
-                else if (direction == VRageMath.Vector3I.Backward)
-                {
-                    groupedThrusters[2].currentThrust += thruster.CurrentThrust;
-                    groupedThrusters[2].maxEffectiveThrust += thruster.MaxEffectiveThrust;
-                }
-                else if (direction == VRageMath.Vector3I.Forward)
-                {
-                    groupedThrusters[3].currentThrust += thruster.CurrentThrust;
-                    groupedThrusters[3].maxEffectiveThrust += thruster.MaxEffectiveThrust;
-                }
-                else if (direction == VRageMath.Vector3I.Right)
-                {
-                    groupedThrusters[4].currentThrust += thruster.CurrentThrust;
-                    groupedThrusters[4].maxEffectiveThrust += thruster.MaxEffectiveThrust;
-                }
-                else if (direction == VRageMath.Vector3I.Left)
-                {
-                    groupedThrusters[5].currentThrust += thruster.CurrentThrust;
-                    groupedThrusters[5].maxEffectiveThrust += thruster.MaxEffectiveThrust;
-                }
-            }
-        }
-
         // Not my own piece of code, method found here: https://stackoverflow.com/questions/12181024/formatting-a-number-with-a-metric-prefix
-        public string ToSI(float f, string format = null)
+        public static string ToSI(float f, string format = null)
         {
-            if (f == 0)
-            {
-                return "0";
-            }
+            if (f == 0) return "0";
+
             char[] incPrefixes = new[] { 'k', 'M', 'G', 'T', 'P', 'E', 'Z', 'Y' };
             char[] decPrefixes = new[] { 'm', '\u03bc', 'n', 'p', 'f', 'a', 'z', 'y' };
 
@@ -141,19 +119,16 @@ namespace IngameScript
             return scaled.ToString(format) + prefix;
         }
 
-        // Struct for grouping thrusters for each direction.
-        private struct GroupedThrusters
+        // Makes first letter of a string upper case and the rest lower case.
+        public static string FirstLetterCapital(string s)
         {
-            public string directionName;
-            public float currentThrust;
-            public float maxEffectiveThrust;
+            if (string.IsNullOrEmpty(s))  return "";
 
-            public GroupedThrusters (string name)
-            {
-                directionName = name;
-                currentThrust = 0;
-                maxEffectiveThrust = 0;
-            }
+            if (s.Length == 1) return s.ToUpper();
+
+            char[] c = s.ToLower().ToCharArray();
+            c[0] = char.ToUpper(c[0]);
+            return new string (c);
         }
     }
 }
