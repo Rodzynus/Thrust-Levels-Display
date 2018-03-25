@@ -90,7 +90,7 @@ namespace IngameScript
                             displayLines += $" {thruster.Percentage().ToString("n1")}%\n";
                         }
                     }
-                    
+
                     // Write on the display.
                     display.WritePublicText(displayLines, false);
                     display.ShowPublicTextOnScreen();

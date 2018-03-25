@@ -18,6 +18,7 @@ namespace IngameScript
 {
     partial class Program
     {
+        // Class keeping whole groups of thrusters in all directions.
         public class GroupOfThrusters
         {
             private List<DirectionalThrusters> directionalThrusters;
