@@ -23,21 +23,34 @@ namespace IngameScript
         public class ParseArguments
         {
             public string Group;
-            public string[] Arguments;
+            public List<Directions> directions;
 
             public ParseArguments(string args)
             {
-                if (args.ToLower().StartsWith("group"))
-                {
-                    string[] argumentsSplit = args.Split(':');
-                    Group = argumentsSplit[1];
-                    Arguments = new string[argumentsSplit.Length - 2];
-                    Array.ConstrainedCopy(argumentsSplit, 2, Arguments, 0, argumentsSplit.Length - 2);
-                }
-                else
-                {
+                directions = new List<Directions>();
+                if (string.IsNullOrEmpty(args))
+                {  
                     Group = string.Empty;
-                    Arguments = args.Split(':');
+                    return;
+                }
+                string[] argumentsSplit = args.Split(':');
+                GetDirections(ref argumentsSplit);
+            }
+
+            private void GetDirections(ref string[] argumentsSplit)
+            {
+                for (int i = 0; i < argumentsSplit.Length; i++)
+                {
+                    if (argumentsSplit[i].Equals("group", StringComparison.OrdinalIgnoreCase))
+                    {
+                        Group = argumentsSplit[i + 1];
+                        continue;
+                    }
+                    Directions direction;
+                    if (Enum.TryParse(FirstLetterCapital(argumentsSplit[i]), out direction))
+                    {
+                        directions.Add(direction);
+                    }
                 }
             }
         }

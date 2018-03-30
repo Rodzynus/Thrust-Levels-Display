@@ -21,91 +21,69 @@ namespace IngameScript
         // Class keeping whole groups of thrusters in all directions.
         public class GroupOfThrusters
         {
-            private List<DirectionalThrusters> directionalThrusters;
+            public List<DirectionalThrusters> directionalThrusters;
             private string group;
             private Program myGP;
 
-            public List<DirectionalThrusters> Thrusters { get { return directionalThrusters; } }
             public string Group { get { return group; } }
 
-            public GroupOfThrusters(Program MyGP)
+            public GroupOfThrusters(Program MyGP, ParseArguments arguments, ref List<IMyThrust> AllThrusters)
             {
                 directionalThrusters = new List<DirectionalThrusters>();
                 myGP = MyGP;
-                DefaultFill();
-                GetThrust();
-            }
 
-            public GroupOfThrusters(Program MyGP, ParseArguments arguments)
-            {
-                directionalThrusters = new List<DirectionalThrusters>();
-                myGP = MyGP;
-                group = arguments.Group;
-                if (arguments.Arguments.Count() > 0)
+                if (!arguments.directions.Any()) DefaultFill();
+                else
+                    foreach (Directions direction in arguments.directions)
+                        directionalThrusters.Add(new DirectionalThrusters(direction));
+
+                if (!String.IsNullOrEmpty(arguments.Group))
                 {
-                    foreach (string argument in arguments.Arguments)
-                    {
-                        string formArgument = FirstLetterCapital(argument);
-                        if (formArgument == "Up" || formArgument == "Down" || formArgument == "Forward" || formArgument == "Backward" || formArgument == "Left" || formArgument == "Right")
-                            directionalThrusters.Add(new DirectionalThrusters(formArgument));
-                    }
+                    group = arguments.Group;
+                    List<IMyThrust> thrusters = new List<IMyThrust>();
+                    try { myGP.GridTerminalSystem.GetBlockGroupWithName(group).GetBlocksOfType<IMyThrust>(thrusters); }
+                    catch (Exception) { myGP.Echo($"No thrusters detected in {group} group or the group doesn't exist."); return; }
+                    GetThrust(ref thrusters);
                 }
-                else DefaultFill();
-                GetThrust();
+                else GetThrust(ref AllThrusters);
             }
 
             private void DefaultFill()
             {
-                directionalThrusters.Add(new DirectionalThrusters("Up"));
-                directionalThrusters.Add(new DirectionalThrusters("Down"));
-                directionalThrusters.Add(new DirectionalThrusters("Forward"));
-                directionalThrusters.Add(new DirectionalThrusters("Backward"));
-                directionalThrusters.Add(new DirectionalThrusters("Left"));
-                directionalThrusters.Add(new DirectionalThrusters("Right"));
+                directionalThrusters.Add(new DirectionalThrusters(Directions.Up));
+                directionalThrusters.Add(new DirectionalThrusters(Directions.Down));
+                directionalThrusters.Add(new DirectionalThrusters(Directions.Forward));
+                directionalThrusters.Add(new DirectionalThrusters(Directions.Backward));
+                directionalThrusters.Add(new DirectionalThrusters(Directions.Left));
+                directionalThrusters.Add(new DirectionalThrusters(Directions.Right));
             }
 
-            private void GetThrust()
+            private void GetThrust(ref List<IMyThrust> thrusters)
             {
-                List<IMyThrust> thrusters = new List<IMyThrust>();
-                if (!string.IsNullOrWhiteSpace(group))
-                {
-                    try
-                    {
-                        myGP.GridTerminalSystem.GetBlockGroupWithName(group).GetBlocksOfType<IMyThrust>(thrusters);
-
-                    }
-                    catch (Exception)
-                    { myGP.Echo($"Group {group} doesn't exist."); }
-                }
-                else
-                {
-                    try { myGP.GridTerminalSystem.GetBlocksOfType<IMyThrust>(thrusters); }
-                    catch (Exception) { myGP.Echo("No thrusters detected."); }
-                }
-
                 foreach (IMyThrust thruster in thrusters)
                 {
                     // This returns direction of the nozzle. If statements are inverted to get direction of thrust instead.
-                    string direction = VRageMath.Vector3I.GetDominantDirection(thruster.GridThrustDirection).ToString();
-                    switch (direction)
+                    Directions direction = Directions.Up;   // Defaults to Up just to satisfy the compiler. Will be overritten with actual value.
+                    string nozzleDirection = VRageMath.Vector3I.GetDominantDirection(thruster.GridThrustDirection).ToString();
+                    switch (nozzleDirection)
                     {
                         case "Up":
-                            direction = "Down"; break;
+                            direction = Directions.Down; break;
                         case "Down":
-                            direction = "Up"; break;
+                            direction = Directions.Up; break;
                         case "Forward":
-                            direction = "Backward"; break;
+                            direction = Directions.Backward; break;
                         case "Backward":
-                            direction = "Forward"; break;
+                            direction = Directions.Forward; break;
                         case "Left":
-                            direction = "Right"; break;
+                            direction = Directions.Right; break;
                         case "Right":
-                            direction = "Left"; break;
+                            direction = Directions.Left; break;
                     }
 
                     foreach (DirectionalThrusters directionalThruster in directionalThrusters)
                     {
-                        if (directionalThruster.DirectionName == direction)
+                        if (directionalThruster.direction == direction)
                         {
                             directionalThruster.CurrentThrust += thruster.CurrentThrust;
                             directionalThruster.MaxEffectiveThrust += thruster.MaxEffectiveThrust;
@@ -113,7 +91,6 @@ namespace IngameScript
                     }
                 }
             }
- 
         }
     }
 }

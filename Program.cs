@@ -30,6 +30,7 @@ namespace IngameScript
         * Ex. group:Special Thrusters
         *
         * To filter direction you want to display, type directions separated by a colon.
+        * Group tag has to be at the beginning of the line.
         * Ex. Up:Forward:Left:Right
         * Ex. group:Special Thrusters:Forward:Up
 
@@ -38,63 +39,67 @@ namespace IngameScript
         // Tag which scripts looks for when finding LCDs to write to.
         const string lcdTag = "[thrusters]";
 
+        public enum Directions : byte { Up, Down, Forward, Backward, Left, Right };
+        public Queue<double> timings;
         Program()
         {
             Runtime.UpdateFrequency = UpdateFrequency.Update10;
+            timings = new Queue<double>();
         }
 
         public void Main()
         {
             List<IMyTextPanel> displays = new List<IMyTextPanel>();
-            GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(displays);
-            if (displays.Count == 0)
-            {
-                Echo("No valid displays detected.");
-                return;
-            }
+            try { GridTerminalSystem.GetBlocksOfType<IMyTextPanel>(displays); }
+            catch (Exception) { Echo("No displays detected."); return; }
+
+            List<IMyThrust> allThrusters = new List<IMyThrust>();
+            try { GridTerminalSystem.GetBlocksOfType<IMyThrust>(allThrusters); }
+            catch (Exception) { Echo("No thrusters detected."); return; }
 
             foreach (IMyTextPanel display in displays)
             {
-                if (display.CustomName.Contains(lcdTag))
+                if (!display.CustomName.Contains(lcdTag)) continue;
+
+                StringBuilder displayLines = new StringBuilder();
+
+                if (display.CustomData.Length > 0)
                 {
-                    List<ParseArguments> arguments = new List<ParseArguments>();
-                    if (display.CustomData.Length > 0)
+                    string[] customLines = display.CustomData.Split('\n');
+                    foreach (string line in customLines)
                     {
-                        string[] customLines = display.CustomData.Split('\n');
-                        foreach (string line in customLines) arguments.Add(new ParseArguments(line));
+                        GenerateLCDText(ref displayLines, ref allThrusters, line);
                     }
-                    
-                    List<GroupOfThrusters> groupsOfThrusters = new List<GroupOfThrusters>();
-
-                    if (arguments.Count > 0)
-                    {
-                        foreach (ParseArguments argument in arguments)
-                        {
-                            groupsOfThrusters.Add(new GroupOfThrusters(this, argument));
-                        }
-                    }
-                    else groupsOfThrusters.Add(new GroupOfThrusters(this));
-                    
-                    string displayLines = "";
-
-                    foreach (GroupOfThrusters groupOfThrusters in groupsOfThrusters)
-                    {
-                        if (!string.IsNullOrEmpty(groupOfThrusters.Group))
-                        {
-                            displayLines += $" {groupOfThrusters.Group}:\n";
-                        }
-
-                        foreach (DirectionalThrusters thruster in groupOfThrusters.Thrusters)
-                        {
-                            displayLines += $" {thruster.DirectionName} {ToSI(thruster.CurrentThrust, "n0")}N/{ToSI(thruster.MaxEffectiveThrust, "n0")}N\n";
-                            displayLines += $" {thruster.Percentage().ToString("n1")}%\n";
-                        }
-                    }
-
-                    // Write on the display.
-                    display.WritePublicText(displayLines, false);
-                    display.ShowPublicTextOnScreen();
                 }
+                else
+                {
+                    GenerateLCDText(ref displayLines, ref allThrusters);
+                }
+
+                if (timings.Count < 10) timings.Enqueue(Runtime.LastRunTimeMs);
+                else
+                {
+                    timings.Dequeue();
+                    timings.Enqueue(Runtime.LastRunTimeMs);
+                    displayLines.Append($"Average (10 runs): {timings.Average()}");
+                }
+                // Write on the display.
+                display.WritePublicText(displayLines, false);
+                display.ShowPublicTextOnScreen();
+            }
+        }
+
+        public void GenerateLCDText(ref StringBuilder displayLines, ref List<IMyThrust> allThrusters, string line = "")
+        {
+            GroupOfThrusters groupOfThrusters = new GroupOfThrusters(this, new ParseArguments(line), ref allThrusters);
+            if (!string.IsNullOrEmpty(groupOfThrusters.Group))
+            {
+                displayLines.Append($" {groupOfThrusters.Group}:\n");
+            }
+            foreach (DirectionalThrusters thruster in groupOfThrusters.directionalThrusters)
+            {
+                displayLines.Append($" {thruster.direction.ToString()} {ToSI(thruster.CurrentThrust, "n0")}N/{ToSI(thruster.MaxEffectiveThrust, "n0")}N\n");
+                displayLines.Append($" {thruster.Percentage().ToString("n1")}%\n");
             }
         }
 

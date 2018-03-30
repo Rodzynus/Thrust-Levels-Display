@@ -21,13 +21,13 @@ namespace IngameScript
         // Class for grouping thrusters for each direction.
         public class DirectionalThrusters
         {
-            public string DirectionName;
+            public Directions direction;
             public float CurrentThrust;
             public float MaxEffectiveThrust;
 
-            public DirectionalThrusters(string name)
+            public DirectionalThrusters(Directions name)
             {
-                DirectionName = name;
+                direction = name;
                 CurrentThrust = 0;
                 MaxEffectiveThrust = 0;
             }
