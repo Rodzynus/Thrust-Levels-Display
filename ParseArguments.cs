@@ -19,11 +19,10 @@ namespace IngameScript
     partial class Program
     {
         // Class used for parsing arguments passed through LCD Custom Data.
-        // Not much here for now but done this for practice, readability and potential future expansion.
         public class ParseArguments
         {
-            public string Group;
-            public List<Directions> directions;
+            public string Group { get; private set; }
+            public List<Directions> directions { get; private set; }
 
             public ParseArguments(string args)
             {
@@ -34,10 +33,10 @@ namespace IngameScript
                     return;
                 }
                 string[] argumentsSplit = args.Split(':');
-                GetDirections(ref argumentsSplit);
+                GetArguments(argumentsSplit);
             }
 
-            private void GetDirections(ref string[] argumentsSplit)
+            private void GetArguments(string[] argumentsSplit)
             {
                 for (int i = 0; i < argumentsSplit.Length; i++)
                 {
@@ -50,6 +49,7 @@ namespace IngameScript
                     if (Enum.TryParse(FirstLetterCapital(argumentsSplit[i]), out direction))
                     {
                         directions.Add(direction);
+                        continue;
                     }
                 }
             }

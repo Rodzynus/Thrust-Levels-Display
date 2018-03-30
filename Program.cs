@@ -39,12 +39,12 @@ namespace IngameScript
         // Tag which scripts looks for when finding LCDs to write to.
         const string lcdTag = "[thrusters]";
 
+        /* === Script Body: === */
         public enum Directions : byte { Up, Down, Forward, Backward, Left, Right };
-        public Queue<double> timings;
+
         Program()
         {
             Runtime.UpdateFrequency = UpdateFrequency.Update10;
-            timings = new Queue<double>();
         }
 
         public void Main()
@@ -59,48 +59,64 @@ namespace IngameScript
 
             foreach (IMyTextPanel display in displays)
             {
+                // If display doesn't contain the tag, skip it.
                 if (!display.CustomName.Contains(lcdTag)) continue;
 
+                // StringBuilder for writing on the display.
                 StringBuilder displayLines = new StringBuilder();
 
-                if (display.CustomData.Length > 0)
+                // Iterate through Custom Data to grab arguments and build the displayLines.
+                string[] customLines = display.CustomData.Split('\n');
+                foreach (string line in customLines)
                 {
-                    string[] customLines = display.CustomData.Split('\n');
-                    foreach (string line in customLines)
-                    {
-                        GenerateLCDText(ref displayLines, ref allThrusters, line);
-                    }
-                }
-                else
-                {
-                    GenerateLCDText(ref displayLines, ref allThrusters);
+                    GenerateLCDText(ref displayLines, allThrusters, line);
                 }
 
-                if (timings.Count < 10) timings.Enqueue(Runtime.LastRunTimeMs);
-                else
-                {
-                    timings.Dequeue();
-                    timings.Enqueue(Runtime.LastRunTimeMs);
-                    displayLines.Append($"Average (10 runs): {timings.Average()}");
-                }
                 // Write on the display.
                 display.WritePublicText(displayLines, false);
                 display.ShowPublicTextOnScreen();
             }
         }
 
-        public void GenerateLCDText(ref StringBuilder displayLines, ref List<IMyThrust> allThrusters, string line = "")
+        public void GenerateLCDText(ref StringBuilder displayLines, List<IMyThrust> allThrusters, string line)
         {
-            GroupOfThrusters groupOfThrusters = new GroupOfThrusters(this, new ParseArguments(line), ref allThrusters);
-            if (!string.IsNullOrEmpty(groupOfThrusters.Group))
+            ParseArguments arguments = new ParseArguments(line);
+            List<DirectionalThrusters> thrusters = new List<DirectionalThrusters>();
+
+            if (!string.IsNullOrEmpty(arguments.Group))
             {
-                displayLines.Append($" {groupOfThrusters.Group}:\n");
+                displayLines.Append($" {arguments.Group}:\n");
+
+                try { GridTerminalSystem.GetBlockGroupWithName(arguments.Group).GetBlocksOfType<IMyThrust>(allThrusters); }
+                catch (Exception) { Echo($"No thrusters detected in {arguments.Group} group or the group doesn't exist."); return; }   
             }
-            foreach (DirectionalThrusters thruster in groupOfThrusters.directionalThrusters)
+            FillDirectionThrusterList(ref thrusters, allThrusters, arguments);
+
+            foreach (DirectionalThrusters directionalThruster in thrusters)
             {
-                displayLines.Append($" {thruster.direction.ToString()} {ToSI(thruster.CurrentThrust, "n0")}N/{ToSI(thruster.MaxEffectiveThrust, "n0")}N\n");
-                displayLines.Append($" {thruster.Percentage().ToString("n1")}%\n");
+                displayLines.Append($" {directionalThruster.Direction.ToString()} {ToSI(directionalThruster.CurrentThrust, "n0")}N/{ToSI(directionalThruster.MaxEffectiveThrust, "n0")}N\n");
+                displayLines.Append($" {directionalThruster.Percentage().ToString("n1")}%\n");
             }
+        }
+
+        private void FillDirectionThrusterList(ref List<DirectionalThrusters> directionalThrusters, List<IMyThrust> thrusters, ParseArguments arguments)
+        {
+            // Build the list of directions to show.
+            if (!arguments.directions.Any())
+            {
+                directionalThrusters.Add(new DirectionalThrusters(Directions.Up));
+                directionalThrusters.Add(new DirectionalThrusters(Directions.Down));
+                directionalThrusters.Add(new DirectionalThrusters(Directions.Forward));
+                directionalThrusters.Add(new DirectionalThrusters(Directions.Backward));
+                directionalThrusters.Add(new DirectionalThrusters(Directions.Left));
+                directionalThrusters.Add(new DirectionalThrusters(Directions.Right));
+            }
+            else
+            {
+                foreach (Directions direction in arguments.directions)
+                    directionalThrusters.Add(new DirectionalThrusters(direction));
+            }
+            DirectionalThrusters.GetThrust(thrusters, ref directionalThrusters);
         }
 
         // Not my own piece of code, method found here: https://stackoverflow.com/questions/12181024/formatting-a-number-with-a-metric-prefix
